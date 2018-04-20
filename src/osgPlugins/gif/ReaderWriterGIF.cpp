@@ -34,7 +34,7 @@
  *
  *
  * Ported into the OSG as a plugin, Robert Osfield Decemeber 2000.
- * Note, reference above to license of simage_rgb is not relevent to the OSG
+ * Note, reference above to license of simage_rgb is not relevant to the OSG
  * as the OSG does not use it.  Also for patches, bugs and new features
  * please send them direct to the OSG dev team rather than address above.
  *
@@ -60,46 +60,45 @@ extern  "C"
 
 #define MY_GIF_DEBUG 1
 
-// GifImageStream class 
+// GifImageStream class
 class GifImageStream : public osg::ImageStream, public OpenThreads::Thread
 {
 public:
     GifImageStream() :
         osg::ImageStream(),
         _multiplier(1.0),
-        _currentLength(0), 
-        _length(0), 
-        _frameNum(0), 
-        _dataNum(0), 
+        _currentLength(0),
+        _length(0),
+        _frameNum(0),
+        _dataNum(0),
         _done(false)
     {
         _status=PAUSED;
     }
 
     virtual Object* clone() const { return new GifImageStream; }
-    virtual bool isSameKindAs( const Object* obj ) const 
+    virtual bool isSameKindAs( const Object* obj ) const
     { return dynamic_cast<const GifImageStream*>(obj) != NULL; }
     virtual const char* className() const { return "GifImageStream"; }
 
-    virtual void play() 
-    { 
-        if (!isRunning()) 
+    virtual void play()
+    {
+        if (!isRunning())
             start();
-        _status=PLAYING; 
+        _status=PLAYING;
     }
 
     virtual void pause() { _status=PAUSED; }
 
     virtual void rewind() { setReferenceTime( 0.0 ); }
 
-    virtual void quit( bool waitForThreadToExit=true ) 
+    virtual void quit( bool waitForThreadToExit=true )
     {
         _done = true;
-        if ( waitForThreadToExit )
+        if (isRunning() && waitForThreadToExit)
         {
-            while( isRunning() )
-                OpenThreads::Thread::YieldCurrentThread();
-            OSG_DEBUG<<"GifImageStream thread quitted"<<std::endl;
+            cancel();
+            join();
         }
     }
 
@@ -107,7 +106,7 @@ public:
     virtual double getLength() const { return _length*0.01*_multiplier; }
 
     // Go to a specific position of stream
-    virtual void setReferenceTime( double time ) 
+    virtual void setReferenceTime( double time )
     {
         OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
 
@@ -130,14 +129,14 @@ public:
     virtual double getReferenceTime() const { return _currentLength*0.01*_multiplier; }
 
     // Speed up, slow down or back to normal (1.0)
-    virtual void setTimeMultiplier( double m ) 
+    virtual void setTimeMultiplier( double m )
     {
         OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
         if ( m>0 )
             _multiplier = m;
     }
     virtual double getTimeMultiplier() const { return _multiplier; }
-    
+
     // Not used in GIF animation
     virtual void setVolume(float) {}
     virtual float getVolume() const { return 0.0f; }
@@ -230,7 +229,7 @@ protected:
         }
     }
 
-    virtual ~GifImageStream() 
+    virtual ~GifImageStream()
     {
         if( isRunning() )
             quit( true );
@@ -315,11 +314,11 @@ int transparent)
         col = *rowdata++;
                                  /* just in case */
         if (col >= colormapsize) col = 0;
-        
+
         if ( col == transparent )
         {
             // keep pixels of last image if transparent mode is on
-            // this is necessary for GIF animating 
+            // this is necessary for GIF animating
             ptr += 3;
         }
         else
@@ -369,8 +368,12 @@ GifImageStream** obj)
     /* The way an interlaced image should be read - offsets and jumps */
     int interlacedoffset[] = { 0, 4, 2, 1 };
     int interlacedjumps[] = { 8, 8, 4, 2 };
-
+#if (GIFLIB_MAJOR >= 5)
+    int Error;
+    giffile = DGifOpen(&fin,gif_read_stream, &Error);
+#else
     giffile = DGifOpen(&fin,gif_read_stream);
+#endif
     if (!giffile)
     {
         giferror = ERR_OPEN;
@@ -500,7 +503,7 @@ GifImageStream** obj)
                     }
                 }
 
-                // Record gif image stream 
+                // Record gif image stream
                 if ( *obj && obj )
                 {
                     (*obj)->addToImageStream( giffile->SWidth, giffile->SHeight, 1, 4, delaytime, buffer );
@@ -525,7 +528,7 @@ GifImageStream** obj)
                     if (extension[0] >= 4 && extension[1] & 0x1) transparent = extension[4];
                     else transparent = -1;
 
-                    delaytime = (extension[3]<<8)+extension[2];    // minimum unit 1/100s, so 8 here means 8/100s 
+                    delaytime = (extension[3]<<8)+extension[2];    // minimum unit 1/100s, so 8 here means 8/100s
                 }
                 while (extension != NULL)
                 {
@@ -557,19 +560,23 @@ GifImageStream** obj)
     *width_ret = giffile->SWidth;
     *height_ret = giffile->SHeight;
     *numComponents_ret = 4;
+#if (GIFLIB_MAJOR >= 5&& !(GIFLIB_MAJOR == 5 && GIFLIB_MINOR == 0))
+    DGifCloseFile(giffile, &Error);
+#else
     DGifCloseFile(giffile);
+#endif
     return buffer;
 }
 
 class ReaderWriterGIF : public osgDB::ReaderWriter
 {
     public:
-    
+
         ReaderWriterGIF()
         {
             supportsExtension("gif","GIF Image format");
         }
-    
+
         virtual const char* className() const { return "GIF Image Reader"; }
 
         ReadResult readGIFStream(std::istream& fin) const
@@ -592,7 +599,7 @@ class ReaderWriterGIF : public osgDB::ReaderWriter
                     return ReadResult("GIF loader: Out of memory error");
             }
 
-            // Use GifImageStream to display animate GIFs 
+            // Use GifImageStream to display animate GIFs
             if ( gifStream )
             {
                 OSG_DEBUG<<"Using GifImageStream ..."<<std::endl;
