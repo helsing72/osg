@@ -12,7 +12,22 @@ SET(SOURCES_H
     ${HEADER_PATH}/QGraphicsViewAdapter
 )
 
-QT4_WRAP_CPP( SOURCES_H_MOC ${SOURCES_H} OPTIONS "-f" )
+# setup include dirs, compiler switches and such for all Qt apps
+if(Qt5Widgets_FOUND)
+  include_directories(${Qt5Core_INCLUDE_DIRS})
+  include_directories(${Qt5Widgets_INCLUDE_DIRS})
+  # Qt5 needs fPIC even for executables
+  if(CMAKE_COMPILER_IS_GNUCXX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
+  endif()
+  # include Qt5 specific switches, e.g. -DQT_WIDGETS_LIB
+  add_definitions(${Qt5Widgets_DEFINITIONS})
+
+  QT5_WRAP_CPP( SOURCES_H_MOC ${SOURCES_H} )
+elseif(Qt4_FOUND)
+  include(${QT_USE_FILE})
+  QT4_WRAP_CPP( SOURCES_H_MOC ${SOURCES_H} OPTIONS "-f" )
+endif()
 
 SET(TARGET_H
     ${HEADER_PATH}/Export
@@ -47,20 +62,30 @@ IF(CMAKE_COMPILER_IS_GNUCXX)
    STRING(REGEX REPLACE "-pedantic" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 ENDIF()
 
-SET(TARGET_LIBRARIES
+if(Qt5Widgets_FOUND)
+  if(TARGET Qt5::Widgets)
+    #target_link_libraries(${LIB_NAME} Qt5::Core Qt5::Widgets Qt5::OpenGL)
+    SET(TARGET_LIBRARIES ${TARGET_LIBRARIES} Qt5::Core Qt5::Widgets Qt5::OpenGL)
+  else()
+    #qt5_use_modules(${LIB_NAME} Widgets OpenGL)
+    SET(TARGET_LIBRARIES ${TARGET_LIBRARIES} ${QT_QTCORE_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTOPENGL_LIBRARY} )
+  endif()
+elseif(Qt4_FOUND)
+  #target_link_libraries(${LIB_NAME} ${QT_LIBRARIES})
+  SET(TARGET_LIBRARIES
     ${TARGET_LIBRARIES}
-    ${QT_QTCORE_LIBRARY} 
+    ${QT_QTCORE_LIBRARY}
     ${QT_QTGUI_LIBRARY}
     ${QT_QTOPENGL_LIBRARY}
-)
+    )
+endif()
 
 # FIXME: This should work but something with the LINK_WITH_VARIABLES macro is not working
 #SET(TARGET_LIBRARIES_VARS
-#    QT_QTCORE_LIBRARY 
+#    QT_QTCORE_LIBRARY
 #    QT_QTGUI_LIBRARY
 #    QT_QTOPENGL_LIBRARY
 #)
 INCLUDE_DIRECTORIES(${QT_INCLUDE_DIR} ${QT_QTCORE_INCLUDE_DIR})
 
 SETUP_LIBRARY(${LIB_NAME})
-
